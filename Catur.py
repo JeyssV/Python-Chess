@@ -7,14 +7,14 @@ pygame.mixer.init()
 info = pygame.display.Info()
 SCREEN_WIDTH, SCREEN_HEIGHT = info.current_w, info.current_h
 
-WIDTH, HEIGHT = min(800, SCREEN_WIDTH), min(800, SCREEN_HEIGHT)
+WIDTH, HEIGHT = min(720, SCREEN_WIDTH), min(720, SCREEN_HEIGHT)
 
 window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Catur")
 
-move_sound = pygame.mixer.Sound('Catur/Sound/Move.wav')
-capture_sound = pygame.mixer.Sound('Catur/Sound/Capture.wav')
-gover_sound = pygame.mixer.Sound('Catur/Sound/Game_Over.wav')
+move_sound = pygame.mixer.Sound('Sound/Move.wav')
+capture_sound = pygame.mixer.Sound('Sound/Capture.wav')
+gover_sound = pygame.mixer.Sound('Sound/Game_Over.wav')
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -28,18 +28,18 @@ SQUARE_SIZE = WIDTH // 8
 PIECE_SIZE = SQUARE_SIZE - 20
 
 PIECE_IMAGES = {
-    'white_pawn': pygame.transform.scale(pygame.image.load('Catur/Icon/white_pawn.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'white_rook': pygame.transform.scale(pygame.image.load('Catur/Icon/white_rook.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'white_knight': pygame.transform.scale(pygame.image.load('Catur/Icon/white_knight.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'white_bishop': pygame.transform.scale(pygame.image.load('Catur/Icon/white_bishop.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'white_queen': pygame.transform.scale(pygame.image.load('Catur/Icon/white_queen.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'white_king': pygame.transform.scale(pygame.image.load('Catur/Icon/white_king.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_pawn': pygame.transform.scale(pygame.image.load('Catur/Icon/black_pawn.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_rook': pygame.transform.scale(pygame.image.load('Catur/Icon/black_rook.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_knight': pygame.transform.scale(pygame.image.load('Catur/Icon/black_knight.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_bishop': pygame.transform.scale(pygame.image.load('Catur/Icon/black_bishop.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_queen': pygame.transform.scale(pygame.image.load('Catur/Icon/black_queen.png'), (PIECE_SIZE, PIECE_SIZE)),
-    'black_king': pygame.transform.scale(pygame.image.load('Catur/Icon/black_king.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_pawn': pygame.transform.scale(pygame.image.load('Icon/white_pawn.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_rook': pygame.transform.scale(pygame.image.load('Icon/white_rook.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_knight': pygame.transform.scale(pygame.image.load('Icon/white_knight.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_bishop': pygame.transform.scale(pygame.image.load('Icon/white_bishop.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_queen': pygame.transform.scale(pygame.image.load('Icon/white_queen.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'white_king': pygame.transform.scale(pygame.image.load('Icon/white_king.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_pawn': pygame.transform.scale(pygame.image.load('Icon/black_pawn.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_rook': pygame.transform.scale(pygame.image.load('Icon/black_rook.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_knight': pygame.transform.scale(pygame.image.load('Icon/black_knight.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_bishop': pygame.transform.scale(pygame.image.load('Icon/black_bishop.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_queen': pygame.transform.scale(pygame.image.load('Icon/black_queen.png'), (PIECE_SIZE, PIECE_SIZE)),
+    'black_king': pygame.transform.scale(pygame.image.load('Icon/black_king.png'), (PIECE_SIZE, PIECE_SIZE)),
 }
 
 INITIAL_POSITIONS = {
@@ -60,6 +60,177 @@ INITIAL_POSITIONS = {
         'king': [(0, 4)]
     }
 }
+
+def valid_moves_for_enemy_king(pieces, enemy_turn):
+    enemy_king_position = pieces[enemy_turn]['king'][0]
+    enemy_moves = []
+
+    for color, piece_type in pieces.items():
+        if color != enemy_turn:
+            for piece, positions in piece_type.items():
+                for row, col in positions:
+                    moves = valid_moves(piece, row, col, pieces, color)
+                    for move in moves:
+                        if move == enemy_king_position:
+                            enemy_moves.append(move)
+
+    return enemy_moves
+
+def ai_move_smart(pieces, turn, depth=2):
+    def evaluate_position(pieces, turn):
+        piece_values = {
+            'pawn': 1, 'knight': 3, 'bishop': 3.25, 'rook': 5, 'queen': 9, 'king': 1000
+        }
+
+        total_score = 0
+        enemy_turn = 'white' if turn == 'black' else 'black'
+        enemy_king_position = pieces[enemy_turn]['king'][0]
+
+        ai_king_position = pieces[turn]['king'][0]
+
+        for color, piece_type in pieces.items():
+            for piece, positions in piece_type.items():
+                for row, col in positions:
+                    value = piece_values[piece]
+
+                    if piece == 'pawn':
+                        if col > 0 and (row + 1, col - 1) not in positions and (row - 1, col - 1) not in positions:
+                            value -= 0.2
+
+                    if piece in ['pawn', 'knight', 'bishop']:
+                        if 2 <= row <= 5 and 2 <= col <= 5:
+                            value += 0.5 
+
+                    if piece == 'king':
+                        if 1 <= row <= 6 and 1 <= col <= 6:
+                            value -= 0.5 
+
+                    if enemy_king_position:
+                        enemy_king_row, enemy_king_col = enemy_king_position
+                        distance_to_king = abs(row - enemy_king_row) + abs(col - enemy_king_col)
+
+                        if piece in ['knight', 'bishop', 'queen', 'rook']:
+                            value += (10 - distance_to_king) * 0.3 
+                            if distance_to_king == 1:
+                                value += 5 
+
+                    moves = valid_moves(piece, row, col, pieces, color)
+                    value += len(moves) * 0.1 
+
+                    if color == turn:
+                        total_score += value
+                    else:
+                        total_score -= value
+
+                    if piece == 'king' and color == turn:
+                        enemy_moves = valid_moves_for_enemy_king(pieces, enemy_turn)
+                        if ai_king_position in enemy_moves:
+                            total_score -= 10 
+
+        return total_score
+
+    def minimax(pieces, depth, alpha, beta, maximizing_player, turn):
+        winner = check_winner(pieces)
+        if winner:
+            return (1000 if winner == 'black' else -1000) if maximizing_player else (-1000 if winner == 'black' else 1000)
+
+        if depth == 0:
+            return evaluate_position(pieces, turn)
+
+        if maximizing_player:
+            max_eval = -float('inf')
+            for piece, positions in pieces['black'].items():
+                for start_row, start_col in positions:
+                    moves = valid_moves(piece, start_row, start_col, pieces, 'black')
+                    for move in moves:
+                        end_row, end_col = move
+                        
+                        enemy_king_position = pieces['white']['king'][0]
+                        if (end_row, end_col) == enemy_king_position:
+                            return 1000
+
+                        pieces_copy = {k: {p: pos.copy() for p, pos in v.items()} for k, v in pieces.items()}
+                        target = piece_at(pieces_copy, end_row, end_col)
+                        if target:
+                            pieces_copy[target[0]][target[1]].remove((end_row, end_col))
+                        pieces_copy['black'][piece].remove((start_row, start_col))
+                        pieces_copy['black'][piece].append((end_row, end_col))
+
+                        eval = minimax(pieces_copy, depth - 1, alpha, beta, False, 'white')
+                        max_eval = max(max_eval, eval)
+                        alpha = max(alpha, eval)
+                        if beta <= alpha:
+                            break
+            return max_eval
+        else:
+            min_eval = float('inf')
+            for piece, positions in pieces['white'].items():
+                for start_row, start_col in positions:
+                    moves = valid_moves(piece, start_row, start_col, pieces, 'white')
+                    for move in moves:
+                        end_row, end_col = move
+
+                        enemy_king_position = pieces['black']['king'][0]
+                        if (end_row, end_col) == enemy_king_position:
+                            return -1000
+
+                        pieces_copy = {k: {p: pos.copy() for p, pos in v.items()} for k, v in pieces.items()}
+                        target = piece_at(pieces_copy, end_row, end_col)
+                        if target:
+                            pieces_copy[target[0]][target[1]].remove((end_row, end_col))
+                        pieces_copy['white'][piece].remove((start_row, start_col))
+                        pieces_copy['white'][piece].append((end_row, end_col))
+
+                        eval = minimax(pieces_copy, depth - 1, alpha, beta, True, 'black')
+                        min_eval = min(min_eval, eval)
+                        beta = min(beta, eval)
+                        if beta <= alpha:
+                            break
+            return min_eval
+
+    best_move = None
+    best_score = -float('inf')
+
+    for piece, positions in pieces['black'].items():
+        for start_row, start_col in positions:
+            moves = valid_moves(piece, start_row, start_col, pieces, 'black')
+            for move in moves:
+                end_row, end_col = move
+
+                pieces_copy = {k: {p: pos.copy() for p, pos in v.items()} for k, v in pieces.items()}
+                target = piece_at(pieces_copy, end_row, end_col)
+                enemy_king_position = pieces['white']['king'][0]
+                if (end_row, end_col) == enemy_king_position:
+                    pieces[target[0]][target[1]].remove((end_row, end_col))
+                    pieces['black'][piece].remove((start_row, start_col))
+                    pieces['black'][piece].append((end_row, end_col))
+                    return
+
+                if target:
+                    pieces_copy[target[0]][target[1]].remove((end_row, end_col))
+                pieces_copy['black'][piece].remove((start_row, start_col))
+                pieces_copy['black'][piece].append((end_row, end_col))
+
+                score = minimax(pieces_copy, depth - 1, -float('inf'), float('inf'), False, 'black')
+                if score > best_score:
+                    best_move = (piece, (start_row, start_col), (end_row, end_col))
+                    best_score = score
+
+    if best_move:
+        piece, (start_row, start_col), (end_row, end_col) = best_move
+        target = piece_at(pieces, end_row, end_col)
+        move_sound.play()
+
+        if target and target[0] != turn:
+            target_color, target_piece = target
+            pieces[target_color][target_piece].remove((end_row, end_col))
+            winner = check_winner(pieces)
+
+            if not winner:
+                capture_sound.play()
+
+        pieces[turn][piece].remove((start_row, start_col))
+        pieces[turn][piece].append((end_row, end_col))
 
 def draw_board():
     for row in range(8):
@@ -197,6 +368,7 @@ def display_winner(winner):
     font = pygame.font.Font(None, 72)
     message = f"{'Putih' if winner == 'white' else 'Hitam'} Menang!"
     text = font.render(message, True, BLACK)
+    gover_sound.play()
 
     blur_surface = pygame.Surface((WIDTH, HEIGHT))
     blur_surface.set_alpha(128)
@@ -208,17 +380,43 @@ def display_winner(winner):
 
     pygame.time.wait(3000)
 
-def reset_game():
+def reset_game(mode):
     pieces = {'white': {}, 'black': {}}
     for color, piece_type in INITIAL_POSITIONS.items():
         for piece, positions in piece_type.items():
             pieces[color][piece] = positions.copy() 
-    return pieces, 'white', None, []
+    return pieces, 'white', None, [], mode
+
+def main_menu():
+    font = pygame.font.Font(None, 72)
+    play_pvp_text = font.render('Pemain vs Pemain', True, BLACK)
+    play_ai_text = font.render('Pemain vs AI', True, BLACK)
+    
+    while True:
+        window.fill(WHITE)
+        window.blit(play_pvp_text, (WIDTH // 2 - play_pvp_text.get_width() // 2, HEIGHT // 3))
+        window.blit(play_ai_text, (WIDTH // 2 - play_ai_text.get_width() // 2, HEIGHT // 2))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if HEIGHT // 3 <= y <= HEIGHT // 3 + 72:
+                    return 'pvp'
+                elif HEIGHT // 2 <= y <= HEIGHT // 2 + 72:
+                    return 'ai'
+
+        pygame.display.flip()
 
 def main():
     clock = pygame.time.Clock()
+    game_mode = main_menu()
 
-    pieces, turn, selected_piece, valid_moves_list = reset_game()
+    pieces, turn, selected_piece, valid_moves_list, mode = reset_game(game_mode)
+    ai_thinking_start = None 
+    ai_delay = 1500 
 
     while True:
         draw_board()
@@ -227,12 +425,11 @@ def main():
         if selected_piece:
             start_row, start_col = selected_piece
             highlight_square(start_row, start_col, HIGHLIGHT_COLOR, border_width=4)
-            
             for move_row, move_col in valid_moves_list:
                 target = piece_at(pieces, move_row, move_col)
-                if target and target[0] != turn:  
+                if target and target[0] != turn:
                     highlight_square(move_row, move_col, MOVE_EAT_HIGHLIGHTCOLOR, border_width=4)
-                else:  
+                else:
                     highlight_square(move_row, move_col, MOVE_HIGHLIGHT_COLOR, border_width=4)
 
         for event in pygame.event.get():
@@ -240,55 +437,113 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = pygame.mouse.get_pos()
-                row, col = y // SQUARE_SIZE, x // SQUARE_SIZE
-                clicked_piece = piece_at(pieces, row, col)
+            if mode == 'pvp':
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    x, y = pygame.mouse.get_pos()
+                    row, col = y // SQUARE_SIZE, x // SQUARE_SIZE
+                    clicked_piece = piece_at(pieces, row, col)
 
-                if selected_piece:
-                    if (row, col) in valid_moves_list:
-                        color, piece = piece_at(pieces, selected_piece[0], selected_piece[1])
-                        pieces[color][piece].remove(selected_piece)
-                        move_sound.play()
+                    if selected_piece:
+                        if (row, col) in valid_moves_list:
+                            color, piece = piece_at(pieces, selected_piece[0], selected_piece[1])
+                            pieces[color][piece].remove(selected_piece)
+                            move_sound.play()
 
-                        target = piece_at(pieces, row, col)
-                        if target and target[0] != turn:
-                            target_color, target_piece = target
-                            pieces[target_color][target_piece].remove((row, col))
-                            
+                            target = piece_at(pieces, row, col)
+                            if target and target[0] != turn:
+                                target_color, target_piece = target
+                                pieces[target_color][target_piece].remove((row, col))
+
+                                winner = check_winner(pieces)
+                                if not winner:
+                                    capture_sound.play()
+
+                            pieces[color][piece].append((row, col))
+
+                            if piece == 'pawn' and (row == 0 or row == 7):
+                                if not winner:
+                                    promoted_piece = promote_pawn(turn, row, col)
+                                    pieces[color][piece].remove((row, col))
+
+                                    if promoted_piece:
+                                        pieces[color][promoted_piece].append((row, col))
+
                             winner = check_winner(pieces)
                             if winner:
-                                gover_sound.play()
-                            elif not winner:
-                                capture_sound.play()
+                                display_winner(winner)
+                                pieces, turn, selected_piece, valid_moves_list, mode = reset_game(game_mode)
+                            else:
+                                turn = 'black' if turn == 'white' else 'white'
 
-                        pieces[color][piece].append((row, col))
+                        selected_piece = None
+                        valid_moves_list = []
 
-                        if piece == 'pawn' and (row == 0 or row == 7):
-                            if not winner:
-                                promoted_piece = promote_pawn(turn, row, col)
-                                pieces[color][piece].remove((row, col))
+                    elif clicked_piece and clicked_piece[0] == turn:
+                        selected_piece = (row, col)
+                        valid_moves_list = valid_moves(clicked_piece[1], row, col, pieces, turn)
 
-                                if promoted_piece:
-                                    pieces[color][promoted_piece].append((row, col))
+            if turn == 'white' and mode == 'ai':
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    x, y = pygame.mouse.get_pos()
+                    row, col = y // SQUARE_SIZE, x // SQUARE_SIZE
+                    clicked_piece = piece_at(pieces, row, col)
 
-                        winner = check_winner(pieces)
-                        if winner:
-                            display_winner(winner)
-                            pieces, turn, selected_piece, valid_moves_list = reset_game()
+                    if selected_piece:
+                        if (row, col) in valid_moves_list:
+                            color, piece = piece_at(pieces, selected_piece[0], selected_piece[1])
+                            pieces[color][piece].remove(selected_piece)
+                            move_sound.play()
 
-                        else:
-                            turn = 'black' if turn == 'white' else 'white'
+                            target = piece_at(pieces, row, col)
+                            if target and target[0] != turn:
+                                target_color, target_piece = target
+                                pieces[target_color][target_piece].remove((row, col))
 
-                    selected_piece = None
-                    valid_moves_list = []
+                                winner = check_winner(pieces)
+                                if not winner:
+                                    capture_sound.play()
 
-                elif clicked_piece and clicked_piece[0] == turn:
-                    selected_piece = (row, col)
-                    valid_moves_list = valid_moves(clicked_piece[1], row, col, pieces, turn)
+                            pieces[color][piece].append((row, col))
+
+                            if piece == 'pawn' and (row == 0 or row == 7):
+                                if not winner:
+                                    promoted_piece = promote_pawn(turn, row, col)
+                                    pieces[color][piece].remove((row, col))
+
+                                    if promoted_piece:
+                                        pieces[color][promoted_piece].append((row, col))
+
+                            winner = check_winner(pieces)
+                            if winner:
+                                display_winner(winner)
+                                pieces, turn, selected_piece, valid_moves_list, mode = reset_game(game_mode)
+                            else:
+                                turn = 'black'
+
+                        selected_piece = None
+                        valid_moves_list = []
+
+                    elif clicked_piece and clicked_piece[0] == turn:
+                        selected_piece = (row, col)
+                        valid_moves_list = valid_moves(clicked_piece[1], row, col, pieces, turn)
+
+        if turn == 'black' and mode == 'ai':
+            if not ai_thinking_start:
+                ai_thinking_start = pygame.time.get_ticks()
+
+            if pygame.time.get_ticks() - ai_thinking_start > ai_delay:
+                ai_move_smart(pieces, turn)
+                winner = check_winner(pieces)
+
+                if winner:
+                    display_winner(winner)
+                    pieces, turn, selected_piece, valid_moves_list, mode = reset_game(game_mode)
+                else:
+                    turn = 'white'
+                ai_thinking_start = None
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(30)
 
 if __name__ == '__main__':
     main()
